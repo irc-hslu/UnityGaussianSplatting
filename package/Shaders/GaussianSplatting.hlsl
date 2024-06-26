@@ -2,6 +2,14 @@
 #ifndef GAUSSIAN_SPLATTING_HLSL
 #define GAUSSIAN_SPLATTING_HLSL
 
+//static const float contrastFactor = 1.0; // Adjust this value to increase or decrease contrast
+
+half3 AdjustContrast(half3 color, float contrast)
+{
+    // Apply the contrast formula
+    return ((color - 0.5) * contrast + 0.5);
+}
+
 float InvSquareCentered01(float x)
 {
     x -= 0.5;
@@ -136,7 +144,7 @@ struct SplatSHData
     half3 col, sh1, sh2, sh3, sh4, sh5, sh6, sh7, sh8, sh9, sh10, sh11, sh12, sh13, sh14, sh15;
 };
 
-half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH)
+half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float contrastFactor)
 {
     dir *= -1;
 
@@ -175,6 +183,8 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH)
             }
         }
     }
+
+    res = AdjustContrast(res, contrastFactor); 
     return max(res, 0);
 }
 

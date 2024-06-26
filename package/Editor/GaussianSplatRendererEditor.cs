@@ -22,6 +22,7 @@ namespace GaussianSplatting.Editor
 
         SerializedProperty m_PropAsset;
         SerializedProperty m_PropSplatScale;
+        SerializedProperty m_ContrastFactor;
         SerializedProperty m_PropOpacityScale;
         SerializedProperty m_PropSHOrder;
         SerializedProperty m_PropSHOnly;
@@ -61,6 +62,7 @@ namespace GaussianSplatting.Editor
 
             m_PropAsset = serializedObject.FindProperty("m_Asset");
             m_PropSplatScale = serializedObject.FindProperty("m_SplatScale");
+            m_ContrastFactor = serializedObject.FindProperty("m_ContrastFactor");
             m_PropOpacityScale = serializedObject.FindProperty("m_OpacityScale");
             m_PropSHOrder = serializedObject.FindProperty("m_SHOrder");
             m_PropSHOnly = serializedObject.FindProperty("m_SHOnly");
@@ -104,6 +106,7 @@ namespace GaussianSplatting.Editor
             EditorGUILayout.Space();
             GUILayout.Label("Render Options", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(m_PropSplatScale);
+            EditorGUILayout.PropertyField(m_ContrastFactor);
             EditorGUILayout.PropertyField(m_PropOpacityScale);
             EditorGUILayout.PropertyField(m_PropSHOrder);
             EditorGUILayout.PropertyField(m_PropSHOnly);
