@@ -81,6 +81,9 @@ RWStructuredBuffer<SplatViewData> _SplatViewData;
 
 float _SplatScale;
 float _ContrastFactor;
+float _Hue;
+float _Saturation;
+float _Lightness;
 float _SplatOpacityScale;
 uint _SHOrder;
 uint _SHOnly;
@@ -198,6 +201,9 @@ void CSCalcViewData (uint3 id : SV_DispatchThreadID)
     half opacityScale = _SplatOpacityScale;
     float splatScale = _SplatScale;
     float contrastFactor = _ContrastFactor;
+    float hue = _Hue;
+    float saturation = _Saturation;
+    float lightness = _Lightness;
 
     // deleted?
     if (_SplatBitsValid)
@@ -240,7 +246,8 @@ void CSCalcViewData (uint3 id : SV_DispatchThreadID)
         objViewDir = normalize(objViewDir);
 
         half4 col;
-        col.rgb = ShadeSH(splat.sh, objViewDir, _SHOrder, _SHOnly != 0, contrastFactor);
+        col.rgb = ShadeSH(splat.sh, objViewDir, _SHOrder, _SHOnly != 0, contrastFactor,
+            hue, saturation, lightness);
         col.a = min(splat.opacity * opacityScale, 65000);
         view.color.x = (f32tof16(col.r) << 16) | f32tof16(col.g);
         view.color.y = (f32tof16(col.b) << 16) | f32tof16(col.a);

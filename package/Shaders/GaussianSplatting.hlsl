@@ -144,7 +144,63 @@ struct SplatSHData
     half3 col, sh1, sh2, sh3, sh4, sh5, sh6, sh7, sh8, sh9, sh10, sh11, sh12, sh13, sh14, sh15;
 };
 
-half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float contrastFactor)
+float Epsilon = 1e-10;
+
+float3 RGBtoHCV(in float3 RGB)
+{
+    // Based on work by Sam Hocevar and Emil Persson
+    float4 P = (RGB.g < RGB.b) ? float4(RGB.bg, -1.0, 2.0/3.0) : float4(RGB.gb, 0.0, -1.0/3.0);
+    float4 Q = (RGB.r < P.x) ? float4(P.xyw, RGB.r) : float4(RGB.r, P.yzx);
+    float C = Q.x - min(Q.w, Q.y);
+    float H = abs((Q.w - Q.y) / (6 * C + Epsilon) + Q.z);
+    return float3(H, C, Q.x);
+}
+
+float3 RGBtoHSL(in float3 RGB)
+{
+    float3 HCV = RGBtoHCV(RGB);
+    float L = HCV.z - HCV.y * 0.5;
+    float S = HCV.y / (1 - abs(L * 2 - 1) + Epsilon);
+    return float3(HCV.x, S, L);
+}
+float3 HUEtoRGB(in float H)
+{
+    float R = abs(H * 6 - 3) - 1;
+    float G = 2 - abs(H * 6 - 2);
+    float B = 2 - abs(H * 6 - 4);
+    return saturate(float3(R,G,B));
+}
+
+float3 HSLtoRGB(in float3 HSL)
+{
+    float3 RGB = HUEtoRGB(HSL.x);
+    float C = (1 - abs(2 * HSL.z - 1)) * HSL.y;
+    return (RGB - 0.5) * C + HSL.z;
+}
+
+float3 AdjustHue(float3 hsl, float hue)
+{
+    hsl.x += hue;
+    hsl.x = frac(hsl.x);
+    return hsl;
+}
+
+float3 AdjustSaturation(float3 hsl, float saturation)
+{
+    hsl.y += saturation;
+    hsl.y = saturate(hsl.y);
+    return hsl;
+}
+
+float3 AdjustLightness(float3 hsl, float lightness)
+{
+    hsl.z += lightness;
+    hsl.z = saturate(hsl.z);
+    return hsl;
+}
+
+half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float contrastFactor,
+    float hue, float saturation, float lightness)
 {
     dir *= -1;
 
@@ -184,7 +240,18 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
         }
     }
 
-    res = AdjustContrast(res, contrastFactor); 
+    // Apply contrast
+    float3 contrastAdjustedRgb = AdjustContrast(res, contrastFactor); 
+
+    // Apply Hue, Saturation and Lightness
+    float3 hsl = RGBtoHSL(res);
+    hsl = AdjustHue(hsl, hue);
+    hsl = AdjustSaturation(hsl, saturation);
+    hsl = AdjustLightness(hsl, lightness);
+    float3 hslAdjustedRgb = HSLtoRGB(hsl);
+
+    res = lerp(contrastAdjustedRgb, hslAdjustedRgb, 0.5);
+
     return max(res, 0);
 }
 

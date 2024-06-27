@@ -136,6 +136,9 @@ namespace GaussianSplatting.Runtime
                 mpb.SetBuffer(GaussianSplatRenderer.Props.OrderBuffer, gs.m_GpuSortKeys);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatScale, gs.m_SplatScale);
                 mpb.SetFloat(GaussianSplatRenderer.Props.ContrastFactor, gs.m_ContrastFactor);
+                mpb.SetFloat(GaussianSplatRenderer.Props.Hue, gs.m_Hue);
+                mpb.SetFloat(GaussianSplatRenderer.Props.Saturation, gs.m_Saturation);
+                mpb.SetFloat(GaussianSplatRenderer.Props.Lightness, gs.m_Lightness);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatOpacityScale, gs.m_OpacityScale);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatSize, gs.m_PointDisplaySize);
                 mpb.SetInteger(GaussianSplatRenderer.Props.SHOrder, gs.m_SHOrder);
@@ -221,6 +224,17 @@ namespace GaussianSplatting.Runtime
         [Range(0.1f, 2.0f)] [Tooltip("Additional scaling factor for the splats")]
         public float m_ContrastFactor = 1.0f;
 
+        [Range(0.0f, 1.0f)] [Tooltip("Hue shift for the splats")]
+        public float m_Hue = 0.0f;
+
+        [Range(-1.0f, 1.0f)] [Tooltip("Saturation factor for the splats")]
+        public float m_Saturation = 0.0f;
+
+        [Range(-1.0f, 1.0f)] [Tooltip("Lightness factor for the splats")]
+        public float m_Lightness = 0.0f;
+
+
+
         [Range(0.05f, 20.0f)]
 
         [Tooltip("Additional scaling factor for opacity")]
@@ -295,6 +309,9 @@ namespace GaussianSplatting.Runtime
             public static readonly int OrderBuffer = Shader.PropertyToID("_OrderBuffer");
             public static readonly int SplatScale = Shader.PropertyToID("_SplatScale");
             public static readonly int ContrastFactor = Shader.PropertyToID("_ContrastFactor");
+            public static readonly int Hue = Shader.PropertyToID("_Hue");
+            public static readonly int Saturation = Shader.PropertyToID("_Saturation");
+            public static readonly int Lightness = Shader.PropertyToID("_Lightness");
             public static readonly int SplatOpacityScale = Shader.PropertyToID("_SplatOpacityScale");
             public static readonly int SplatSize = Shader.PropertyToID("_SplatSize");
             public static readonly int SplatCount = Shader.PropertyToID("_SplatCount");
@@ -575,6 +592,9 @@ namespace GaussianSplatting.Runtime
             cmb.SetComputeVectorParam(m_CSSplatUtilities, Props.VecWorldSpaceCameraPos, camPos);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.SplatScale, m_SplatScale);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.ContrastFactor, m_ContrastFactor);
+            cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Hue, m_Hue);
+            cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Saturation, m_Saturation);
+            cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Lightness, m_Lightness);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.SplatOpacityScale, m_OpacityScale);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOrder, m_SHOrder);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOnly, m_SHOnly ? 1 : 0);
