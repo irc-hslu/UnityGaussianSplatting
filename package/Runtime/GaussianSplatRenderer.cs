@@ -139,6 +139,7 @@ namespace GaussianSplatting.Runtime
                 mpb.SetFloat(GaussianSplatRenderer.Props.Hue, gs.m_Hue);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Saturation, gs.m_Saturation);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Lightness, gs.m_Lightness);
+                mpb.SetFloat(GaussianSplatRenderer.Props.WhiteBalance, gs.m_WhiteBalance);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatOpacityScale, gs.m_OpacityScale);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatSize, gs.m_PointDisplaySize);
                 mpb.SetInteger(GaussianSplatRenderer.Props.SHOrder, gs.m_SHOrder);
@@ -233,11 +234,11 @@ namespace GaussianSplatting.Runtime
         [Range(-1.0f, 1.0f)] [Tooltip("Lightness factor for the splats")]
         public float m_Lightness = 0.0f;
 
+        [Range(0.0f, 10000.0f)] [Tooltip("White balance adjustment for the splats")]
+        public float m_WhiteBalance = 1.0f;
 
 
-        [Range(0.05f, 20.0f)]
-
-        [Tooltip("Additional scaling factor for opacity")]
+        [Range(0.05f, 20.0f)] [Tooltip("Additional scaling factor for opacity")]
         public float m_OpacityScale = 1.0f;
         [Range(0, 3)] [Tooltip("Spherical Harmonics order to use")]
         public int m_SHOrder = 3;
@@ -312,6 +313,7 @@ namespace GaussianSplatting.Runtime
             public static readonly int Hue = Shader.PropertyToID("_Hue");
             public static readonly int Saturation = Shader.PropertyToID("_Saturation");
             public static readonly int Lightness = Shader.PropertyToID("_Lightness");
+            public static readonly int WhiteBalance = Shader.PropertyToID("_WhiteBalance");
             public static readonly int SplatOpacityScale = Shader.PropertyToID("_SplatOpacityScale");
             public static readonly int SplatSize = Shader.PropertyToID("_SplatSize");
             public static readonly int SplatCount = Shader.PropertyToID("_SplatCount");
@@ -595,6 +597,7 @@ namespace GaussianSplatting.Runtime
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Hue, m_Hue);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Saturation, m_Saturation);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Lightness, m_Lightness);
+            cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.WhiteBalance, m_WhiteBalance);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.SplatOpacityScale, m_OpacityScale);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOrder, m_SHOrder);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOnly, m_SHOnly ? 1 : 0);

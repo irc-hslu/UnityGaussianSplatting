@@ -2,13 +2,43 @@
 #ifndef GAUSSIAN_SPLATTING_HLSL
 #define GAUSSIAN_SPLATTING_HLSL
 
-//static const float contrastFactor = 1.0; // Adjust this value to increase or decrease contrast
 
 half3 AdjustContrast(half3 color, float contrast)
 {
     // Apply the contrast formula
     return ((color - 0.5) * contrast + 0.5);
 }
+
+//  todo: move this operation out. it's too expensive at only necessary to be computed once per rendering of all splats.
+// todo: check the correctness of numbers compared to orginal code (may be wrong)
+float3 ColorTemperatureToRGB(float temperatureInKelvins)
+{
+    float3 retColor;
+
+    temperatureInKelvins = clamp(temperatureInKelvins, 1000.0, 40000.0) / 100.0;
+    
+    if (temperatureInKelvins <= 66.0)
+    {
+        retColor.r = 1.0;
+        retColor.g = saturate(0.39008157876901960784 * log(temperatureInKelvins) - 0.63184144378862745098);
+    }
+    else
+    {
+        float t = temperatureInKelvins - 60.0;
+        retColor.r = saturate(1.29293618606274509804 * pow(t, -0.1332047592));
+        retColor.g = saturate(1.12989086089529411765 * pow(t, -0.0755148492));
+    }
+    
+    if (temperatureInKelvins >= 66.0)
+        retColor.b = 1.0;
+    else if (temperatureInKelvins <= 19.0)
+        retColor.b = 0.0;
+    else
+        retColor.b = saturate(0.54320678911019607843 * log(temperatureInKelvins - 10.0) - 1.19625408914);
+
+    return retColor;
+}
+
 
 float InvSquareCentered01(float x)
 {
@@ -146,6 +176,8 @@ struct SplatSHData
 
 float Epsilon = 1e-10;
 
+
+
 float3 RGBtoHCV(in float3 RGB)
 {
     // Based on work by Sam Hocevar and Emil Persson
@@ -178,6 +210,35 @@ float3 HSLtoRGB(in float3 HSL)
     return (RGB - 0.5) * C + HSL.z;
 }
 
+float Luminance2(float3 color)
+{
+    float fmin = min(min(color.r, color.g), color.b);
+    float fmax = max(max(color.r, color.g), color.b);
+    return (fmax + fmin) / 2.0;
+}
+
+float3 AdjustWhiteBalance(float3 color, float temperatureInKelvins, float blendFactor, float luminancePreservation)
+{
+    // Convert temperature to RGB
+    float3 colorTempRGB = ColorTemperatureToRGB(temperatureInKelvins);
+
+    // Calculate original luminance
+    float originalLuminance = Luminance2(color);
+
+    // Blend original color with temperature-adjusted color
+    float3 blended = lerp(color, color * colorTempRGB, blendFactor);
+
+    // Convert blended color to HSL
+    float3 resultHSL = RGBtoHSL(blended);
+
+
+    // Preserve original luminance
+    float3 luminancePreservedRGB = HSLtoRGB(float3(resultHSL.x, resultHSL.y, originalLuminance));
+
+    // Final color with luminance preservation
+    return lerp(blended, luminancePreservedRGB, luminancePreservation);
+}
+
 float3 AdjustHue(float3 hsl, float hue)
 {
     hsl.x += hue;
@@ -200,7 +261,7 @@ float3 AdjustLightness(float3 hsl, float lightness)
 }
 
 half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float contrastFactor,
-    float hue, float saturation, float lightness)
+    float hue, float saturation, float lightness, float temperatureInKelvins)
 {
     dir *= -1;
 
@@ -208,12 +269,28 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
 
     // ambient band
     half3 res = splat.col; // col = sh0 * SH_C0 + 0.5 is already precomputed
-    if (onlySH)
+
+    if (onlySH) {
         res = 0.5;
+    } else {
+        float3 hsl = RGBtoHSL(res);
+        hsl = AdjustHue(hsl, hue);
+        hsl = AdjustSaturation(hsl, saturation);
+        hsl = AdjustLightness(hsl, lightness);
+        float3 hslAdjustedRgb = HSLtoRGB(hsl);
+        res = lerp(res, hslAdjustedRgb, 0.5);
+
+        float blendFactor = 0.5; // Example blend factor
+        float luminancePreservation = 0.75; // Example luminance preservation
+
+        // this operation is currently very expensive. Should be out of the shader.
+        res = AdjustWhiteBalance(res, temperatureInKelvins, blendFactor, luminancePreservation);
+        res = AdjustContrast(res, contrastFactor);
+    }
     // 1st degree
     if (shOrder >= 1)
     {
-        res += SH_C1 * (-splat.sh1 * y + splat.sh2 * z - splat.sh3 * x);
+        res += SH_C1 * (-splat.sh1 * 1.5 * y + splat.sh2 * z - splat.sh3 * x);
         // 2nd degree
         if (shOrder >= 2)
         {
@@ -240,18 +317,7 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
         }
     }
 
-    // Apply contrast
-    float3 contrastAdjustedRgb = AdjustContrast(res, contrastFactor); 
-
-    // Apply Hue, Saturation and Lightness
-    float3 hsl = RGBtoHSL(res);
-    hsl = AdjustHue(hsl, hue);
-    hsl = AdjustSaturation(hsl, saturation);
-    hsl = AdjustLightness(hsl, lightness);
-    float3 hslAdjustedRgb = HSLtoRGB(hsl);
-
-    res = lerp(contrastAdjustedRgb, hslAdjustedRgb, 0.5);
-
+    
     return max(res, 0);
 }
 
