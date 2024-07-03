@@ -146,8 +146,6 @@ struct SplatSHData
 
 float Epsilon = 1e-10;
 
-
-
 float3 RGBtoHCV(in float3 RGB)
 {
     // Based on work by Sam Hocevar and Emil Persson
@@ -241,6 +239,12 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
     if (onlySH) {
         res = 0.5;
     } else {
+
+        float wbBlendFactor = 0.5;
+        float wbLuminancePreservation = 0.75; 
+
+        res = AdjustWhiteBalance(res, temperatureInKelvinsRgb, wbBlendFactor, wbLuminancePreservation);
+
         float3 hsl = RGBtoHSL(res);
         hsl = AdjustHue(hsl, hue);
         hsl = AdjustSaturation(hsl, saturation);
@@ -248,10 +252,6 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
         float3 hslAdjustedRgb = HSLtoRGB(hsl);
         res = lerp(res, hslAdjustedRgb, 0.5);
 
-        float blendFactor = 0.5; // Example blend factor
-        float luminancePreservation = 0.75; // Example luminance preservation
-
-        res = AdjustWhiteBalance(res, temperatureInKelvinsRgb, blendFactor, luminancePreservation);
         res = AdjustContrast(res, contrastFactor);
     }
     // 1st degree
