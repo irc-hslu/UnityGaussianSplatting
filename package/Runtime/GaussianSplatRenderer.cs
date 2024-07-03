@@ -139,7 +139,7 @@ namespace GaussianSplatting.Runtime
                 mpb.SetFloat(GaussianSplatRenderer.Props.Hue, gs.m_Hue);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Saturation, gs.m_Saturation);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Lightness, gs.m_Lightness);
-                mpb.SetFloat(GaussianSplatRenderer.Props.WhiteBalance, gs.m_WhiteBalance);
+                mpb.SetVector(GaussianSplatRenderer.Props.WhiteBalance, GaussianSplatRenderer.ColorTemperatureToRGB(gs.m_WhiteBalance));
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatOpacityScale, gs.m_OpacityScale);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatSize, gs.m_PointDisplaySize);
                 mpb.SetInteger(GaussianSplatRenderer.Props.SHOrder, gs.m_SHOrder);
@@ -566,6 +566,42 @@ namespace GaussianSplatting.Runtime
             DestroyImmediate(m_MatDebugBoxes);
         }
 
+        // TODO: check correctness of numbers
+        // Original code from https://www.shadertoy.com/view/lsSXW1
+        public static Color ColorTemperatureToRGB(float temperatureInKelvins)
+        {
+            Color retColor = new Color();
+
+            temperatureInKelvins = Mathf.Clamp(temperatureInKelvins, 1000.0f, 40000.0f) / 100.0f;
+
+            if (temperatureInKelvins <= 66.0f)
+            {
+                retColor.r = 1.0f;
+                retColor.g = Mathf.Clamp01(0.39008157876901960784f * Mathf.Log(temperatureInKelvins) - 0.63184144378862745098f);
+            }
+            else
+            {
+                float t = temperatureInKelvins - 60.0f;
+                retColor.r = Mathf.Clamp01(1.29293618606274509804f * Mathf.Pow(t, -0.1332047592f));
+                retColor.g = Mathf.Clamp01(1.12989086089529411765f * Mathf.Pow(t, -0.0755148492f));
+            }
+
+            if (temperatureInKelvins >= 66.0f)
+            {
+                retColor.b = 1.0f;
+            }
+            else if (temperatureInKelvins <= 19.0f)
+            {
+                retColor.b = 0.0f;
+            }
+            else
+            {
+                retColor.b = Mathf.Clamp01(0.54320678911019607843f * Mathf.Log(temperatureInKelvins - 10.0f) - 1.19625408914f);
+            }
+
+            return retColor;
+        }
+
         internal void CalcViewData(CommandBuffer cmb, Camera cam, Matrix4x4 matrix)
         {
             if (cam.cameraType == CameraType.Preview)
@@ -597,7 +633,11 @@ namespace GaussianSplatting.Runtime
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Hue, m_Hue);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Saturation, m_Saturation);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Lightness, m_Lightness);
-            cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.WhiteBalance, m_WhiteBalance);
+
+
+            // white balance
+            Color wbColor = ColorTemperatureToRGB(m_WhiteBalance);
+            cmb.SetComputeVectorParam(m_CSSplatUtilities, Props.WhiteBalance, wbColor);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.SplatOpacityScale, m_OpacityScale);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOrder, m_SHOrder);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOnly, m_SHOnly ? 1 : 0);

@@ -9,36 +9,6 @@ half3 AdjustContrast(half3 color, float contrast)
     return ((color - 0.5) * contrast + 0.5);
 }
 
-//  todo: move this operation out. it's too expensive at only necessary to be computed once per rendering of all splats.
-// todo: check the correctness of numbers compared to orginal code (may be wrong)
-float3 ColorTemperatureToRGB(float temperatureInKelvins)
-{
-    float3 retColor;
-
-    temperatureInKelvins = clamp(temperatureInKelvins, 1000.0, 40000.0) / 100.0;
-    
-    if (temperatureInKelvins <= 66.0)
-    {
-        retColor.r = 1.0;
-        retColor.g = saturate(0.39008157876901960784 * log(temperatureInKelvins) - 0.63184144378862745098);
-    }
-    else
-    {
-        float t = temperatureInKelvins - 60.0;
-        retColor.r = saturate(1.29293618606274509804 * pow(t, -0.1332047592));
-        retColor.g = saturate(1.12989086089529411765 * pow(t, -0.0755148492));
-    }
-    
-    if (temperatureInKelvins >= 66.0)
-        retColor.b = 1.0;
-    else if (temperatureInKelvins <= 19.0)
-        retColor.b = 0.0;
-    else
-        retColor.b = saturate(0.54320678911019607843 * log(temperatureInKelvins - 10.0) - 1.19625408914);
-
-    return retColor;
-}
-
 
 float InvSquareCentered01(float x)
 {
@@ -217,16 +187,14 @@ float Luminance2(float3 color)
     return (fmax + fmin) / 2.0;
 }
 
-float3 AdjustWhiteBalance(float3 color, float temperatureInKelvins, float blendFactor, float luminancePreservation)
+// Original code from https://www.shadertoy.com/view/lsSXW1
+float3 AdjustWhiteBalance(float3 color, float3 temperatureInKelvinsRgb, float blendFactor, float luminancePreservation)
 {
-    // Convert temperature to RGB
-    float3 colorTempRGB = ColorTemperatureToRGB(temperatureInKelvins);
-
     // Calculate original luminance
     float originalLuminance = Luminance2(color);
 
     // Blend original color with temperature-adjusted color
-    float3 blended = lerp(color, color * colorTempRGB, blendFactor);
+    float3 blended = lerp(color, color * temperatureInKelvinsRgb, blendFactor);
 
     // Convert blended color to HSL
     float3 resultHSL = RGBtoHSL(blended);
@@ -261,7 +229,7 @@ float3 AdjustLightness(float3 hsl, float lightness)
 }
 
 half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float contrastFactor,
-    float hue, float saturation, float lightness, float temperatureInKelvins)
+    float hue, float saturation, float lightness, float3 temperatureInKelvinsRgb)
 {
     dir *= -1;
 
@@ -283,14 +251,13 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
         float blendFactor = 0.5; // Example blend factor
         float luminancePreservation = 0.75; // Example luminance preservation
 
-        // this operation is currently very expensive. Should be out of the shader.
-        res = AdjustWhiteBalance(res, temperatureInKelvins, blendFactor, luminancePreservation);
+        res = AdjustWhiteBalance(res, temperatureInKelvinsRgb, blendFactor, luminancePreservation);
         res = AdjustContrast(res, contrastFactor);
     }
     // 1st degree
     if (shOrder >= 1)
     {
-        res += SH_C1 * (-splat.sh1 * 1.5 * y + splat.sh2 * z - splat.sh3 * x);
+        res += SH_C1 * (-splat.sh1 * y + splat.sh2 * z - splat.sh3 * x);
         // 2nd degree
         if (shOrder >= 2)
         {

@@ -44,6 +44,7 @@ RWStructuredBuffer<uint> _SplatSortDistances;
 RWStructuredBuffer<uint> _SplatSortKeys;
 uint _SplatCount;
 
+
 // radix sort etc. friendly, see http://stereopsis.com/radix.html
 uint FloatToSortableUint(float f)
 {
@@ -84,7 +85,7 @@ float _ContrastFactor;
 float _Hue;
 float _Saturation;
 float _Lightness;
-float _WhiteBalance;
+float3 _WhiteBalance;
 float _SplatOpacityScale;
 uint _SHOrder;
 uint _SHOnly;
@@ -104,6 +105,7 @@ StructuredBuffer<GaussianCutoutShaderData> _SplatCutouts;
 RWByteAddressBuffer _SplatSelectedBits;
 ByteAddressBuffer _SplatDeletedBits;
 uint _SplatBitsValid;
+
 
 void DecomposeCovariance(float3 cov2d, out float2 v1, out float2 v2)
 {
@@ -205,7 +207,7 @@ void CSCalcViewData (uint3 id : SV_DispatchThreadID)
     float hue = _Hue;
     float saturation = _Saturation;
     float lightness = _Lightness;
-    float whiteBalance = _WhiteBalance;
+    float3 whiteBalance = _WhiteBalance;
 
     // deleted?
     if (_SplatBitsValid)
