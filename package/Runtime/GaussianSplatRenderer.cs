@@ -139,7 +139,13 @@ namespace GaussianSplatting.Runtime
                 mpb.SetFloat(GaussianSplatRenderer.Props.Hue, gs.m_Hue);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Saturation, gs.m_Saturation);
                 mpb.SetFloat(GaussianSplatRenderer.Props.Lightness, gs.m_Lightness);
-                mpb.SetVector(GaussianSplatRenderer.Props.WhiteBalance, GaussianSplatRenderer.ColorTemperatureToRGB(gs.m_WhiteBalance));
+
+                if (gs.m_AdjustWhiteBalance) {
+                    mpb.SetVector(GaussianSplatRenderer.Props.WhiteBalance, GaussianSplatRenderer.ColorTemperatureToRGB(gs.m_WhiteBalance));
+                } else {
+                    mpb.SetVector(GaussianSplatRenderer.Props.WhiteBalance, -1.0f * Vector4.one);
+                }
+
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatOpacityScale, gs.m_OpacityScale);
                 mpb.SetFloat(GaussianSplatRenderer.Props.SplatSize, gs.m_PointDisplaySize);
                 mpb.SetInteger(GaussianSplatRenderer.Props.SHOrder, gs.m_SHOrder);
@@ -234,6 +240,8 @@ namespace GaussianSplatting.Runtime
         [Range(-1.0f, 1.0f)] [Tooltip("Lightness factor for the splats")]
         public float m_Lightness = 0.0f;
 
+        [Tooltip("Use white balance adjustment for the splats")]
+        public bool m_AdjustWhiteBalance;
         [Range(0.0f, 10000.0f)] [Tooltip("White balance adjustment for the splats")]
         public float m_WhiteBalance = 1.0f;
 
@@ -634,10 +642,15 @@ namespace GaussianSplatting.Runtime
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Saturation, m_Saturation);
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.Lightness, m_Lightness);
 
-
             // white balance
-            Color wbColor = ColorTemperatureToRGB(m_WhiteBalance);
-            cmb.SetComputeVectorParam(m_CSSplatUtilities, Props.WhiteBalance, wbColor);
+            if (m_AdjustWhiteBalance)
+            {
+                Color wbColor = ColorTemperatureToRGB(m_WhiteBalance);
+                cmb.SetComputeVectorParam(m_CSSplatUtilities, Props.WhiteBalance, wbColor);
+            } else {
+                cmb.SetComputeVectorParam(m_CSSplatUtilities, Props.WhiteBalance, -1.0f * Vector4.one);
+            }
+
             cmb.SetComputeFloatParam(m_CSSplatUtilities, Props.SplatOpacityScale, m_OpacityScale);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOrder, m_SHOrder);
             cmb.SetComputeIntParam(m_CSSplatUtilities, Props.SHOnly, m_SHOnly ? 1 : 0);

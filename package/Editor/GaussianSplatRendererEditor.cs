@@ -26,6 +26,7 @@ namespace GaussianSplatting.Editor
         SerializedProperty m_Hue;
         SerializedProperty m_Saturation;
         SerializedProperty m_Lightness;
+        SerializedProperty m_AdjustWhiteBalance;
         SerializedProperty m_WhiteBalance;
         SerializedProperty m_PropOpacityScale;
         SerializedProperty m_PropSHOrder;
@@ -70,6 +71,7 @@ namespace GaussianSplatting.Editor
             m_Hue = serializedObject.FindProperty("m_Hue");
             m_Saturation = serializedObject.FindProperty("m_Saturation");
             m_Lightness = serializedObject.FindProperty("m_Lightness");
+            m_AdjustWhiteBalance = serializedObject.FindProperty("m_AdjustWhiteBalance");
             m_WhiteBalance = serializedObject.FindProperty("m_WhiteBalance");
             m_PropOpacityScale = serializedObject.FindProperty("m_OpacityScale");
             m_PropSHOrder = serializedObject.FindProperty("m_SHOrder");
@@ -125,6 +127,7 @@ namespace GaussianSplatting.Editor
             EditorGUILayout.PropertyField(m_Hue);
             EditorGUILayout.PropertyField(m_Saturation);
             EditorGUILayout.PropertyField(m_Lightness);
+            EditorGUILayout.PropertyField(m_AdjustWhiteBalance);
             EditorGUILayout.PropertyField(m_WhiteBalance);
 
             EditorGUILayout.Space();

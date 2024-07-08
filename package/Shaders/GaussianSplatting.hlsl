@@ -242,9 +242,9 @@ half3 ShadeSH(SplatSHData splat, half3 dir, int shOrder, bool onlySH, float cont
 
         float wbBlendFactor = 0.5;
         float wbLuminancePreservation = 0.75; 
-
-        res = AdjustWhiteBalance(res, temperatureInKelvinsRgb, wbBlendFactor, wbLuminancePreservation);
-
+        if (temperatureInKelvinsRgb.r >= 0) {   
+            res = AdjustWhiteBalance(res, temperatureInKelvinsRgb, wbBlendFactor, wbLuminancePreservation);
+        }
         float3 hsl = RGBtoHSL(res);
         hsl = AdjustHue(hsl, hue);
         hsl = AdjustSaturation(hsl, saturation);
