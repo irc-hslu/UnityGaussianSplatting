@@ -10,6 +10,7 @@ using Unity.Profiling.LowLevel;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using UnityEngine.XR;
 
 namespace GaussianSplatting.Runtime
 {
@@ -85,10 +86,14 @@ namespace GaussianSplatting.Runtime
             if (m_ActiveSplats.Count == 0)
                 return false;
 
-            // sort them by depth from camera
+            // sort them by order and depth from camera
             var camTr = cam.transform;
             m_ActiveSplats.Sort((a, b) =>
             {
+                var orderA = a.Item1.m_RenderOrder;
+                var orderB = b.Item1.m_RenderOrder;
+                if (orderA != orderB)
+                    return orderB.CompareTo(orderA);
                 var trA = a.Item1.transform;
                 var trB = b.Item1.transform;
                 var posA = camTr.InverseTransformPoint(trA.position);
@@ -106,6 +111,7 @@ namespace GaussianSplatting.Runtime
             foreach (var kvp in m_ActiveSplats)
             {
                 var gs = kvp.Item1;
+                gs.EnsureMaterials();
                 matComposite = gs.m_MatComposite;
                 var mpb = kvp.Item2;
 
@@ -154,7 +160,7 @@ namespace GaussianSplatting.Runtime
                 mpb.SetInteger(GaussianSplatRenderer.Props.DisplayChunks, gs.m_RenderMode == GaussianSplatRenderer.RenderMode.DebugChunkBounds ? 1 : 0);
 
                 cmb.BeginSample(s_ProfCalcView);
-                gs.CalcViewData(cmb, cam, matrix);
+                gs.CalcViewData(cmb, cam);
                 cmb.EndSample(s_ProfCalcView);
 
                 // draw
@@ -200,6 +206,10 @@ namespace GaussianSplatting.Runtime
             m_CommandBuffer.SetRenderTarget(GaussianSplatRenderer.Props.GaussianSplatRT, BuiltinRenderTextureType.CurrentActive);
             m_CommandBuffer.ClearRenderTarget(RTClearFlags.Color, new Color(0, 0, 0, 0), 0, 0);
 
+            // We only need this to determine whether we're rendering into backbuffer or not. However, detection this
+            // way only works in BiRP so only do it here.
+            m_CommandBuffer.SetGlobalTexture(GaussianSplatRenderer.Props.CameraTargetTexture, BuiltinRenderTextureType.CameraTarget);
+
             // add sorting, view calc and drawing commands for each splat object
             Material matComposite = SortAndRenderSplats(cam, m_CommandBuffer);
 
@@ -225,6 +235,8 @@ namespace GaussianSplatting.Runtime
         }
         public GaussianSplatAsset m_Asset;
 
+        [Tooltip("Rendering order compared to other splats. Within same order splats are sorted by distance. Higher order splats render 'on top of' lower order splats.")]
+        public int m_RenderOrder;
         [Range(0.1f, 2.0f)] [Tooltip("Additional scaling factor for the splats")]
         public float m_SplatScale = 1.0f;
 
@@ -299,6 +311,7 @@ namespace GaussianSplatting.Runtime
         internal int m_FrameCounter;
         GaussianSplatAsset m_PrevAsset;
         Hash128 m_PrevHash;
+        bool m_Registered;
 
         static readonly ProfilerMarker s_ProfSort = new(ProfilerCategory.Render, "GaussianSplat.Sort", MarkerFlags.SampleGPU);
 
@@ -335,13 +348,12 @@ namespace GaussianSplatting.Runtime
             public static readonly int SrcBuffer = Shader.PropertyToID("_SrcBuffer");
             public static readonly int DstBuffer = Shader.PropertyToID("_DstBuffer");
             public static readonly int BufferSize = Shader.PropertyToID("_BufferSize");
-            public static readonly int MatrixVP = Shader.PropertyToID("_MatrixVP");
             public static readonly int MatrixMV = Shader.PropertyToID("_MatrixMV");
-            public static readonly int MatrixP = Shader.PropertyToID("_MatrixP");
             public static readonly int MatrixObjectToWorld = Shader.PropertyToID("_MatrixObjectToWorld");
             public static readonly int MatrixWorldToObject = Shader.PropertyToID("_MatrixWorldToObject");
             public static readonly int VecScreenParams = Shader.PropertyToID("_VecScreenParams");
             public static readonly int VecWorldSpaceCameraPos = Shader.PropertyToID("_VecWorldSpaceCameraPos");
+            public static readonly int CameraTargetTexture = Shader.PropertyToID("_CameraTargetTexture");
             public static readonly int SelectionCenter = Shader.PropertyToID("_SelectionCenter");
             public static readonly int SelectionDelta = Shader.PropertyToID("_SelectionDelta");
             public static readonly int SelectionDeltaRot = Shader.PropertyToID("_SelectionDeltaRot");
@@ -448,6 +460,8 @@ namespace GaussianSplatting.Runtime
             m_GpuSortKeys?.Dispose();
             m_SorterArgs.resources.Dispose();
 
+            EnsureSorterAndRegister();
+
             m_GpuSortDistances = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortDistances" };
             m_GpuSortKeys = new GraphicsBuffer(GraphicsBuffer.Target.Structured, count, 4) { name = "GaussianSplatSortIndices" };
 
@@ -464,21 +478,42 @@ namespace GaussianSplatting.Runtime
                 m_SorterArgs.resources = GpuSorting.SupportResources.Load((uint)count);
         }
 
+        bool resourcesAreSetUp => m_ShaderSplats != null && m_ShaderComposite != null && m_ShaderDebugPoints != null &&
+                                  m_ShaderDebugBoxes != null && m_CSSplatUtilities != null && SystemInfo.supportsComputeShaders;
+
+        public void EnsureMaterials()
+        {
+            if (m_MatSplats == null && resourcesAreSetUp)
+            {
+                m_MatSplats = new Material(m_ShaderSplats) {name = "GaussianSplats"};
+                m_MatComposite = new Material(m_ShaderComposite) {name = "GaussianClearDstAlpha"};
+                m_MatDebugPoints = new Material(m_ShaderDebugPoints) {name = "GaussianDebugPoints"};
+                m_MatDebugBoxes = new Material(m_ShaderDebugBoxes) {name = "GaussianDebugBoxes"};
+            }
+        }
+
+        public void EnsureSorterAndRegister()
+        {
+            if (m_Sorter == null && resourcesAreSetUp)
+            {
+                m_Sorter = new GpuSorting(m_CSSplatUtilities);
+            }
+
+            if (!m_Registered && resourcesAreSetUp)
+            {
+                GaussianSplatRenderSystem.instance.RegisterSplat(this);
+                m_Registered = true;
+            }
+        }
+
         public void OnEnable()
         {
             m_FrameCounter = 0;
-            if (m_ShaderSplats == null || m_ShaderComposite == null || m_ShaderDebugPoints == null || m_ShaderDebugBoxes == null || m_CSSplatUtilities == null)
-                return;
-            if (!SystemInfo.supportsComputeShaders)
+            if (!resourcesAreSetUp)
                 return;
 
-            m_MatSplats = new Material(m_ShaderSplats) {name = "GaussianSplats"};
-            m_MatComposite = new Material(m_ShaderComposite) {name = "GaussianClearDstAlpha"};
-            m_MatDebugPoints = new Material(m_ShaderDebugPoints) {name = "GaussianDebugPoints"};
-            m_MatDebugBoxes = new Material(m_ShaderDebugBoxes) {name = "GaussianDebugBoxes"};
-
-            m_Sorter = new GpuSorting(m_CSSplatUtilities);
-            GaussianSplatRenderSystem.instance.RegisterSplat(this);
+            EnsureMaterials();
+            EnsureSorterAndRegister();
 
             CreateResourcesForAsset();
         }
@@ -567,6 +602,7 @@ namespace GaussianSplatting.Runtime
         {
             DisposeResourcesForAsset();
             GaussianSplatRenderSystem.instance.UnregisterSplat(this);
+            m_Registered = false;
 
             DestroyImmediate(m_MatSplats);
             DestroyImmediate(m_MatComposite);
@@ -610,7 +646,7 @@ namespace GaussianSplatting.Runtime
             return retColor;
         }
 
-        internal void CalcViewData(CommandBuffer cmb, Camera cam, Matrix4x4 matrix)
+        internal void CalcViewData(CommandBuffer cmb, Camera cam)
         {
             if (cam.cameraType == CameraType.Preview)
                 return;
@@ -618,19 +654,17 @@ namespace GaussianSplatting.Runtime
             var tr = transform;
 
             Matrix4x4 matView = cam.worldToCameraMatrix;
-            Matrix4x4 matProj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, true);
             Matrix4x4 matO2W = tr.localToWorldMatrix;
             Matrix4x4 matW2O = tr.worldToLocalMatrix;
             int screenW = cam.pixelWidth, screenH = cam.pixelHeight;
-            Vector4 screenPar = new Vector4(screenW, screenH, 0, 0);
+            int eyeW = XRSettings.eyeTextureWidth, eyeH = XRSettings.eyeTextureHeight;
+            Vector4 screenPar = new Vector4(eyeW != 0 ? eyeW : screenW, eyeH != 0 ? eyeH : screenH, 0, 0);
             Vector4 camPos = cam.transform.position;
 
             // calculate view dependent data for each splat
             SetAssetDataOnCS(cmb, KernelIndices.CalcViewData);
 
-            cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixVP, matProj * matView);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixMV, matView * matO2W);
-            cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixP, matProj);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixObjectToWorld, matO2W);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixWorldToObject, matW2O);
 
@@ -683,6 +717,7 @@ namespace GaussianSplatting.Runtime
             cmd.DispatchCompute(m_CSSplatUtilities, (int)KernelIndices.CalcDistances, (m_GpuSortDistances.count + (int)gsX - 1)/(int)gsX, 1, 1);
 
             // sort the splats
+            EnsureSorterAndRegister();
             m_Sorter.Dispatch(cmd, m_SorterArgs);
             cmd.EndSample(s_ProfSort);
         }
@@ -694,8 +729,15 @@ namespace GaussianSplatting.Runtime
             {
                 m_PrevAsset = m_Asset;
                 m_PrevHash = curHash;
-                DisposeResourcesForAsset();
-                CreateResourcesForAsset();
+                if (resourcesAreSetUp)
+                {
+                    DisposeResourcesForAsset();
+                    CreateResourcesForAsset();
+                }
+                else
+                {
+                    Debug.LogError($"{nameof(GaussianSplatRenderer)} component is not set up correctly (Resource references are missing), or platform does not support compute shaders");
+                }
             }
         }
 
@@ -858,7 +900,6 @@ namespace GaussianSplatting.Runtime
 
             var tr = transform;
             Matrix4x4 matView = cam.worldToCameraMatrix;
-            Matrix4x4 matProj = GL.GetGPUProjectionMatrix(cam.projectionMatrix, true);
             Matrix4x4 matO2W = tr.localToWorldMatrix;
             Matrix4x4 matW2O = tr.worldToLocalMatrix;
             int screenW = cam.pixelWidth, screenH = cam.pixelHeight;
@@ -868,9 +909,7 @@ namespace GaussianSplatting.Runtime
             using var cmb = new CommandBuffer { name = "SplatSelectionUpdate" };
             SetAssetDataOnCS(cmb, KernelIndices.SelectionUpdate);
 
-            cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixVP, matProj * matView);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixMV, matView * matO2W);
-            cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixP, matProj);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixObjectToWorld, matO2W);
             cmb.SetComputeMatrixParam(m_CSSplatUtilities, Props.MatrixWorldToObject, matW2O);
 

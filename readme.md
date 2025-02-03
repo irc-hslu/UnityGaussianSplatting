@@ -15,9 +15,12 @@ Everything in this repository is based on that "OG" gaussian splatting paper. To
 
 :warning: Status as of 2023 December: I'm not planning any significant further developments.
 
-:warning: The only platforms where this is known to work are "PC" (Windows, Mac, Linux) when using either D3D12, Metal or Vulkan graphics APIs.
-Anything else may or migth not work. There are known issues specifically with:
-- Anything related to virtual reality (VR, AR, XR, MR): [#17](https://github.com/aras-p/UnityGaussianSplatting/issues/17)
+
+:warning: The only platforms where this is known to work are the ones that use D3D12, Metal or Vulkan graphics APIs.
+PC (Windows on D3D12 or Vulkan), Mac (Metal), Linux (Vulkan) should work. Anything else I have not actually tested;
+it might work or it might not.
+- Some virtual reality devices work (reportedly HTC Vive, Varjo Aero, Quest 3 and Quest Pro). Some others might not
+  work, e.g. Apple Vision Pro. See [#17](https://github.com/aras-p/UnityGaussianSplatting/issues/17)
 - Anything using OpenGL or OpenGL ES: [#26](https://github.com/aras-p/UnityGaussianSplatting/issues/26)
 - WebGPU might work someday, but seems that today it does not quite have all the required graphics features yet: [#65](https://github.com/aras-p/UnityGaussianSplatting/issues/65)
 - Mobile may or might not work. Some iOS devices definitely do not work ([#72](https://github.com/aras-p/UnityGaussianSplatting/issues/72)),
@@ -29,6 +32,7 @@ You can install the package via the Unity package manager by installing it via t
 
 
 As an alternative, you can also clone this repository, open `projects/GaussianExample` as a Unity project (I use Unity 2022.3, other versions might also work),
+
 and open `GSTestScene` scene in there.
 
 Note that the project requires DX12 or Vulkan on Windows, i.e. **DX11 will not work**. This is **not tested at all on mobile/web**, and probably
@@ -37,8 +41,12 @@ does not work there.
 <img align="right" src="docs/Images/shotAssetCreator.png" width="250px">
 
 Next up, **create some GaussianSplat assets**: open `Tools -> Gaussian Splats -> Create GaussianSplatAsset` menu within Unity.
-In the dialog, point `Input PLY File` to your Gaussian Splat file (note that it has to be a gaussian splat PLY file, not some 
-other PLY file. E.g. in the official paper models, the correct files are under `point_cloud/iteration_*/point_cloud.ply`).
+In the dialog, point `Input PLY/SPZ File` to your Gaussian Splat file. Currently two
+file formats are supported:
+- PLY format from the original 3DGS paper (in the official paper models, the correct files
+  are under `point_cloud/iteration_*/point_cloud.ply`).
+- [Scaniverse SPZ](https://scaniverse.com/spz) format.
+
 Optionally there can be `cameras.json` next to it or somewhere in parent folders.
 
 Pick desired compression options and output folder, and press "Create Asset" button. The compression even at "very low" quality setting is decently usable, e.g. 
@@ -96,6 +104,8 @@ The code I wrote for this is under MIT license. The project also uses several 3r
 
 - [zanders3/json](https://github.com/zanders3/json), MIT license, (c) 2018 Alex Parker.
 - "DeviceRadixSort" GPU sorting code contributed by Thomas Smith ([#82](https://github.com/aras-p/UnityGaussianSplatting/pull/82)).
+- Virtual Reality fixes contributed by [@ninjamode](https://github.com/ninjamode) based on
+  [Unity-VR-Gaussian-Splatting](https://github.com/ninjamode/Unity-VR-Gaussian-Splatting).
 
 However, keep in mind that the [license of the original paper implementation](https://github.com/graphdeco-inria/gaussian-splatting/blob/main/LICENSE.md)
 says that the official _training_ software for the Gaussian Splats is for educational / academic / non-commercial
